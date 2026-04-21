@@ -19,6 +19,63 @@ The agent proposes a hypothesis, implements it, trains for a fixed time budget, 
 
 This repository adapts that exact pattern for tabular data using the [Heart Disease dataset](https://www.kaggle.com/datasets/johnsmith88/heart-disease-dataset) from Kaggle/UCI [2], allowing anyone to run and understand the ratchet loop on a standard CPU in minutes.
 
+It ships two modes:
+
+1. **Live ratchet loop** — an agent-driven Karpathy-style loop (`prepare.py` +
+   `train.py` + `program.md`) that you launch with the `/autoresearch` slash
+   command in Claude Code. The agent edits `train.py`, commits, runs, grades
+   itself on `val_auc`, and keeps or reverts — autonomously, forever.
+2. **Offline simulation** — `src/autoresearch_demo.py`, a self-contained
+   script that walks through 8 pre-scripted hypotheses so you can see the
+   ratchet shape without running an agent.
+
+## 🔁 Live Ratchet Loop (Karpathy pattern)
+
+The live mode mirrors Karpathy's autoresearch repo file-for-file, adapted for
+tabular ML:
+
+| File | Role | Who edits it |
+|---|---|---|
+| `prepare.py` | Frozen harness: loads data, 80/20 split, 5-fold CV, prints `val_auc`, enforces a 180 s wall-clock budget. | Never modified. |
+| `train.py` | The mutable artifact: `HYPOTHESIS` string, `feature_fn`, `build_pipeline`. | Agent edits every iteration. |
+| `program.md` | The skill — Setup, Rules, 9-step loop, NEVER STOP. | Human edits between runs. |
+| `results.tsv` | Append-only ratchet log (commit, val_auc, test_auc, wall_time, status, description). | Agent appends, never commits. |
+| `.claude/commands/autoresearch.md` | Slash command — loads `program.md` and enters the loop. | — |
+
+**Ratchet metric:** `val_auc` (mean of 5-fold stratified CV on the train split).
+`test_auc` is reported for audit but never drives ratchet decisions.
+
+### Kick it off
+
+Inside Claude Code, in this repo:
+
+```
+/autoresearch my-run-tag
+```
+
+The agent creates an `autoresearch/my-run-tag` branch, warms the dataset,
+sanity-runs the baseline, and then enters the 9-step loop. Each iteration it
+emits a single line to you:
+
+```
+iter 3 | val_auc=0.8996 (Δ +0.0012) | KEPT — LightGBM num_leaves=31, reg_lambda=1.0
+iter 4 | val_auc=0.8921 (Δ -0.0075) | DISCARDED — stacking LogReg+RF+XGB
+```
+
+The ratchet only moves forward; discarded commits are reset out of git
+history. Leave it running overnight; review `results.tsv` and `git log` in the
+morning.
+
+### Run one iteration by hand
+
+To eyeball the harness without the agent:
+
+```bash
+uv run prepare.py                  # one-time: cache data/heart.csv
+uv run train.py > run.log 2>&1
+grep "^val_auc:\|^test_auc:\|^wall_time_s:\|^status:" run.log
+```
+
 ## 🚀 Quick Start (using `uv`)
 
 We strongly recommend using [`uv`](https://github.com/astral-sh/uv), the blazing-fast Python package manager written in Rust, to run this project.
@@ -33,7 +90,8 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-### 2. Run the Demo
+### 2. Run the offline simulation
+
 `uv` will automatically create an isolated environment, install dependencies, and run the script in one command:
 
 ```bash
@@ -41,9 +99,12 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 git clone https://github.com/fjfok/autoresearch-edu.git
 cd autoresearch-edu
 
-# Run the AutoResearch ratchet loop demo directly
+# Run the offline scripted simulation (no agent required)
 uv run src/autoresearch_demo.py
 ```
+
+To run the **real agent-driven loop** instead, open Claude Code in this repo
+and type `/autoresearch <your-tag>` — see "Live Ratchet Loop" above.
 
 ### 3. Generate Visualizations
 After the demo completes (takes ~10 minutes on CPU), generate the charts:
@@ -73,15 +134,19 @@ It discovered a non-obvious synergy: combining comprehensive feature engineering
 
 ## 🤖 Claude Slash Command
 
-This repository includes a custom Claude slash command located in `.claude/commands/autoresearch.md`. 
-
-If you use a Claude client that supports slash commands, you can trigger the ratchet loop directly from chat:
+The `.claude/commands/autoresearch.md` slash command launches the **live
+ratchet loop** described above. In Claude Code:
 
 ```text
-/autoresearch heart-disease target roc_auc 10
+/autoresearch gbm-sweep
 ```
 
-The command autonomously loads the dataset, establishes a baseline, runs FLAML, executes `N` ratchet iterations, and generates the final visualizations.
+The command loads `program.md`, creates the `autoresearch/gbm-sweep` branch,
+completes setup, and enters the 9-step ratchet loop autonomously. It runs
+until you interrupt it.
+
+Tune the loop by editing `program.md` between runs — add hints, rule out dead
+ends, or narrow the hypothesis space.
 
 ## 🧠 Key Lessons from the Ratchet Loop
 
@@ -96,11 +161,15 @@ The command autonomously loads the dataset, establishes a baseline, runs FLAML, 
 autoresearch-edu/
 ├── .claude/
 │   └── commands/
-│       └── autoresearch.md    # Claude slash command definition
+│       └── autoresearch.md    # Slash command — loads program.md, enters the loop
+├── prepare.py                 # FROZEN: data, split, CV, metric, time budget
+├── train.py                   # MUTABLE: the single file the agent edits
+├── program.md                 # Skill: Setup + Rules + 9-step loop + NEVER STOP
+├── results.tsv                # Append-only ratchet log (untracked, agent-managed)
 ├── assets/                    # Generated visualization charts
 ├── src/
 │   ├── __init__.py
-│   ├── autoresearch_demo.py   # Main ratchet loop implementation
+│   ├── autoresearch_demo.py   # Offline scripted simulation (no agent required)
 │   └── visualize_results.py   # Chart generation script
 ├── pyproject.toml             # uv / pip dependencies
 ├── README.md

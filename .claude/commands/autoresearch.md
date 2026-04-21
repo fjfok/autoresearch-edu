@@ -1,100 +1,48 @@
-# /autoresearch
+---
+description: Run the Karpathy-style AutoResearch ratchet loop on train.py — autonomous, never stops until interrupted
+argument-hint: [run-tag]
+---
 
-Run an **AutoResearch ratchet loop** on a classification dataset.
+# /autoresearch — launch the ratchet loop
 
-Inspired by Andrej Karpathy's [autoresearch](https://github.com/karpathy/autoresearch) framework (March 2026), this command autonomously proposes ML hypotheses, trains models, evaluates them, and **keeps only improvements** — the ratchet can only move forward.
+You are about to run the AutoResearch ratchet loop on this repository.
+Your job is to follow `program.md` verbatim and iterate on `train.py` until
+the user interrupts. **Do not ask for confirmation between steps.**
 
-## Usage
+## Argument
 
-```
-/autoresearch [dataset_path_or_name] [target_column] [metric] [iterations]
-```
+`$ARGUMENTS` — an optional short kebab-case run tag (e.g. `gbm-sweep`,
+`feat-interactions`). If empty, default to `run-<YYYYMMDD-HHMM>` using the
+current local time.
 
-### Arguments
+## What to do right now
 
-| Argument | Default | Description |
-|---|---|---|
-| `dataset_path_or_name` | `heart-disease` | Path to a CSV file, or a named Kaggle/OpenML dataset |
-| `target_column` | `target` | Name of the binary/multiclass target column |
-| `metric` | `roc_auc` | Evaluation metric: `roc_auc`, `accuracy`, `f1`, `rmse` |
-| `iterations` | `8` | Number of ratchet loop iterations to run |
+1. **Read `program.md`** in the repo root, in full. It is the canonical spec
+   for this loop. If anything here conflicts with `program.md`, `program.md`
+   wins.
+2. **Complete `program.md` § Setup** using `$ARGUMENTS` (or the default tag)
+   as the branch suffix. Create the branch, warm the dataset, sanity-run the
+   baseline, initialise `results.tsv` with the header + baseline row.
+3. **Enter `program.md` § The Loop.** Execute the 9 steps in order. Repeat
+   forever. One hypothesis per iteration, one commit per iteration, one row
+   in `results.tsv` per iteration.
+4. **Report each iteration as a single line** to the user, using the exact
+   format in `program.md` § Reporting. No narration, no tracebacks, no
+   multi-paragraph summaries.
+5. **NEVER STOP** (see `program.md` § NEVER STOP). The only exits are user
+   interrupt, unrecoverable environment failure, or `val_auc ≥ 0.99` (in
+   which case investigate leakage).
 
-### Examples
+## Hard rules (lifted from program.md — do not violate)
 
-```bash
-# Run on the built-in Heart Disease dataset (default)
-/autoresearch
+- Only `train.py` may change between iterations.
+- `prepare.py`, the split, the metric, `pyproject.toml` are frozen. If you
+  think you need to edit them, surface it and stop — do not silently change
+  the harness.
+- `run.log` must never be read whole; use `grep` and `tail -n 50`.
+- `results.tsv` is untracked and append-only. Never `git add` it.
+- `git reset --hard HEAD~1` on any non-improvement. No exceptions.
+- Never peek at `test_auc` when deciding whether to keep a commit.
+- No new dependencies.
 
-# Run on a custom CSV with 10 iterations
-/autoresearch ./data/my_dataset.csv churn roc_auc 10
-
-# Run on a Kaggle titanic dataset
-/autoresearch ./data/titanic.csv Survived accuracy 12
-```
-
-## What This Command Does
-
-When invoked, this command will:
-
-1. **Load & explore** the dataset — shape, class balance, missing values, feature types
-2. **Establish a baseline** — fit a Logistic Regression as the human-researcher starting point
-3. **Run FLAML one-shot** — Microsoft's lightweight AutoML for a 45-second automated search
-4. **Execute the ratchet loop** for `N` iterations:
-   - Propose a hypothesis (feature engineering, model selection, hyperparameters)
-   - Train and evaluate with cross-validation
-   - **Keep** if Test AUC improves over current best
-   - **Discard** (revert) if no improvement — the ratchet never goes backward
-5. **Generate visualizations** — 4-panel results figure, benchmark comparison, feature analysis
-6. **Save results** to `results.json` and print a final summary table
-
-## Output Files
-
-After running, the following files are created in the working directory:
-
-```
-results.json                  # Full experiment log (all iterations)
-autoresearch_results.png      # 4-panel: AUC progress, ratchet diagram, waterfall, kept/discarded
-benchmark_comparison.png      # AutoResearch vs Manual vs AMLB benchmark context
-feature_analysis.png          # Feature importance + class separation charts
-flaml_log.txt                 # FLAML internal search log
-```
-
-## The Ratchet Loop Explained
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                  AUTORESEARCH RATCHET                    │
-│                                                         │
-│  Read program.md  ──►  Propose Hypothesis               │
-│       ▲                      │                          │
-│       │                      ▼                          │
-│  Keep or Revert  ◄──  Modify Config/Code                │
-│       ▲                      │                          │
-│       │                      ▼                          │
-│  Evaluate Metric ◄──  Run Experiment (fixed budget)     │
-│                                                         │
-│  RATCHET: Best AUC can only go UP. Never backward.      │
-└─────────────────────────────────────────────────────────┘
-```
-
-The key invariant: `best_auc[t+1] >= best_auc[t]` for all `t`.
-
-## Requirements
-
-Install dependencies with `uv` (recommended):
-
-```bash
-uv sync
-```
-
-Or with pip:
-
-```bash
-pip install flaml scikit-learn xgboost lightgbm numpy pandas matplotlib
-```
-
-## References
-
-- Karpathy, A. (2026). *autoresearch*. https://github.com/karpathy/autoresearch
-- Gijsbers, P. et al. (2024). *AMLB: an AutoML Benchmark*. JMLR. https://openml.github.io/automlbenchmark/
-- Wang, C. et al. (2021). *FLAML*. MLSys 2021. https://microsoft.github.io/FLAML/
+Begin now by reading `program.md`.

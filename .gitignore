@@ -74,6 +74,10 @@ Thumbs.db
 flaml_log.txt
 *.log
 
+# AutoResearch ratchet artifacts (untracked — the ratchet log lives in git history)
+results.tsv
+run.log
+
 # Data (downloaded at runtime via sklearn/openml)
 data/
 *.csv
