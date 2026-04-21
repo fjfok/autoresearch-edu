@@ -1,0 +1,106 @@
+# ─────────────────────────────────────────────
+#  AutoResearch Educational Repo — .gitignore
+# ─────────────────────────────────────────────
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+MANIFEST
+
+# Virtual environments (uv, venv, conda)
+.venv/
+venv/
+env/
+ENV/
+.env
+.uv/
+
+# uv lock (commit this if you want reproducible installs)
+# uv.lock
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+profile_default/
+ipython_config.py
+
+# Distribution / packaging
+.Python
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+pytestdebug.log
+
+# Type checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Generated outputs (keep assets/, but ignore run-time outputs at root)
+flaml_log.txt
+*.log
+
+# Data (downloaded at runtime via sklearn/openml)
+data/
+*.csv
+*.parquet
+*.feather
+*.h5
+*.hdf5
+
+# Model checkpoints
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.onnx
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Secrets / API keys
+.env
+.env.*
+secrets.toml
+kaggle.json

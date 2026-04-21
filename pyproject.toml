@@ -1,0 +1,62 @@
+[project]
+name = "autoresearch-edu"
+version = "0.1.0"
+description = "Educational implementation of the AutoResearch ratchet loop for tabular ML — CPU-friendly, Kaggle dataset"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "AutoResearch Educational Example" }
+]
+keywords = ["automl", "autoresearch", "machine-learning", "ratchet-loop", "flaml", "kaggle"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Education",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "flaml>=2.3.0",
+    "scikit-learn>=1.4.0",
+    "xgboost>=2.0.0",
+    "lightgbm>=4.3.0",
+    "numpy>=1.26.0",
+    "pandas>=2.2.0",
+    "matplotlib>=3.8.0",
+    "scipy>=1.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "jupyter>=1.0.0",
+    "ipykernel>=6.29.0",
+    "notebook>=7.1.0",
+]
+
+[project.scripts]
+autoresearch-demo = "src.autoresearch_demo:main"
+autoresearch-viz  = "src.visualize_results:main"
+
+[project.urls]
+Repository  = "https://github.com/fjfok/autoresearch-edu"
+"Bug Tracker" = "https://github.com/fjfok/autoresearch-edu/issues"
+"Karpathy Original" = "https://github.com/karpathy/autoresearch"
+"AMLB Benchmark" = "https://github.com/openml/automlbenchmark"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.uv]
+dev-dependencies = [
+    "jupyter>=1.0.0",
+    "ipykernel>=6.29.0",
+    "notebook>=7.1.0",
+]
