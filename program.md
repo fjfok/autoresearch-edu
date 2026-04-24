@@ -22,7 +22,8 @@ Do these once, before the first iteration.
 
 3. **Read the in-scope files in full.** `train.py`, `prepare.py`,
    `pyproject.toml`, and the existing `results.tsv` (if present, `tail -n 20`).
-   Skim `README.md` once for context. Never read `run.log`.
+   Skim `README.md` once for context. Never `cat`, `tail -f`, or read the full
+   `run.log` — only ever `grep` it for the four metric lines (step 5 below).
 
 4. **Warm the dataset cache.** `uv run prepare.py` — creates `data/heart.csv`.
    Skip if the file already exists.
@@ -60,7 +61,7 @@ hypotheses, otherwise you are optimising against the holdout.
 
 **In scope.** `train.py` only. You can add or remove imports from packages
 already declared in `pyproject.toml`: sklearn, xgboost, lightgbm, flaml, numpy,
-pandas, scipy, matplotlib. Anything they expose is fair game — feature
+pandas, scipy. Anything they expose is fair game — feature
 engineering, model choice, hyperparameters, ensembling, calibration,
 preprocessing, feature selection.
 
@@ -77,10 +78,6 @@ preprocessing, feature selection.
 - If `train.py` hangs from your side (rare), `kill` the process after ~240 s
   and record `status: crashed (timeout)` in `results.tsv`.
 - CPU only. No GPU assumptions.
-
-**Simplicity tiebreak.** If a new commit matches the previous `val_auc` within
-1e-6 *and* strictly deletes lines from `train.py`, keep it. Otherwise on a tie
-or regression, revert.
 
 **Anti-gaming (non-negotiable).**
 - Never import `y_test`, the test split, or anything from `prepare.load_data`
@@ -158,9 +155,12 @@ between iterations.
 
 8. **Ratchet decision.**
    - `val_auc > best_so_far` → keep. Ratchet advances.
-   - `val_auc <= best_so_far` → `git reset --hard HEAD~1`. Ratchet does not
-     move. The commit vanishes from history; the `results.tsv` row stays.
-   - Simplicity tiebreak (see above) may override a soft tie.
+   - **Simplicity tiebreak:** `|val_auc − best_so_far| ≤ 1e-6` *and* `train.py`
+     strictly deleted lines this iteration → keep. Ratchet does not advance
+     numerically, but the codebase gets simpler.
+   - Otherwise (tie without simplification, or regression) →
+     `git reset --hard HEAD~1`. The commit vanishes from history; the
+     `results.tsv` row stays.
 
 9. **Loop.** Go to step 1 with a fresh idea. Every ~5 iterations, scan
    `results.tsv` for the shape of ideas you have already discarded and avoid

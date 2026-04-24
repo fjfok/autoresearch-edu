@@ -2,190 +2,118 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![AutoML](https://img.shields.io/badge/AutoML-FLAML-blueviolet)](https://microsoft.github.io/FLAML/)
-[![Claude Command](https://img.shields.io/badge/Claude-Slash_Command-purple)](#claude-slash-command)
+[![Claude Command](https://img.shields.io/badge/Claude-Slash_Command-purple)](#run-it)
 
-An educational implementation of Andrej Karpathy's **AutoResearch ratchet loop** adapted for tabular machine learning. This repository demonstrates how autonomous, iterative experimentation can outperform both manual human baselines and one-shot AutoML on CPU-friendly datasets.
+An educational implementation of Andrej Karpathy's **AutoResearch ratchet loop** [1], adapted for tabular ML. A Claude Code agent edits a single file, measures one number, keeps only improvements — autonomously, forever. Runs on a laptop CPU.
 
-<p align="center">
-  <img src="assets/autoresearch_results.png" alt="AutoResearch Ratchet Loop Results" width="800">
-</p>
+## What is AutoResearch?
 
-## 📖 What is AutoResearch?
+Karpathy released AutoResearch in March 2026 [1] to let AI agents conduct ML research autonomously. The pattern is a **ratchet loop**: the agent proposes a hypothesis, implements it, trains under a fixed budget, evaluates, then either keeps the improvement or reverts. The codebase only moves forward. At scale this pattern has shown ~11% gains on LLM training tasks [1].
 
-**AutoResearch** is a framework released by Andrej Karpathy in March 2026 that enables AI agents to conduct machine learning research autonomously [1]. The core insight is the "ratchet loop": instead of a human researcher manually trying different model architectures, hyperparameters, and feature engineering strategies, an AI agent runs this loop automatically. 
+This repo ports that pattern to the [UCI Heart Disease dataset](https://www.kaggle.com/datasets/johnsmith88/heart-disease-dataset) [2] — small, CPU-friendly, done in minutes. One file (`train.py`) is mutable. Everything else is frozen.
 
-The agent proposes a hypothesis, implements it, trains for a fixed time budget, evaluates the result, and either keeps the improvement or reverts to the previous best. The codebase can only move forward, never backward. Applied at scale, this pattern has achieved 11% performance improvements on LLM training tasks [1].
+## What you see when it's running
 
-This repository adapts that exact pattern for tabular data using the [Heart Disease dataset](https://www.kaggle.com/datasets/johnsmith88/heart-disease-dataset) from Kaggle/UCI [2], allowing anyone to run and understand the ratchet loop on a standard CPU in minutes.
-
-It ships two modes:
-
-1. **Live ratchet loop** — an agent-driven Karpathy-style loop (`prepare.py` +
-   `train.py` + `program.md`) that you launch with the `/autoresearch` slash
-   command in Claude Code. The agent edits `train.py`, commits, runs, grades
-   itself on `val_auc`, and keeps or reverts — autonomously, forever.
-2. **Offline simulation** — `src/autoresearch_demo.py`, a self-contained
-   script that walks through 8 pre-scripted hypotheses so you can see the
-   ratchet shape without running an agent.
-
-## 🔁 Live Ratchet Loop (Karpathy pattern)
-
-The live mode mirrors Karpathy's autoresearch repo file-for-file, adapted for
-tabular ML:
-
-| File | Role | Who edits it |
-|---|---|---|
-| `prepare.py` | Frozen harness: loads data, 80/20 split, 5-fold CV, prints `val_auc`, enforces a 180 s wall-clock budget. | Never modified. |
-| `train.py` | The mutable artifact: `HYPOTHESIS` string, `feature_fn`, `build_pipeline`. | Agent edits every iteration. |
-| `program.md` | The skill — Setup, Rules, 9-step loop, NEVER STOP. | Human edits between runs. |
-| `results.tsv` | Append-only ratchet log (commit, val_auc, test_auc, wall_time, status, description). | Agent appends, never commits. |
-| `.claude/commands/autoresearch.md` | Slash command — loads `program.md` and enters the loop. | — |
-
-**Ratchet metric:** `val_auc` (mean of 5-fold stratified CV on the train split).
-`test_auc` is reported for audit but never drives ratchet decisions.
-
-### Kick it off
-
-Inside Claude Code, in this repo:
+Each iteration, the agent emits a single line:
 
 ```
-/autoresearch my-run-tag
+iter 3 | val_auc=0.8996 (Δ +0.0012) | KEPT       — LightGBM num_leaves=31, reg_lambda=1.0
+iter 4 | val_auc=0.8921 (Δ -0.0075) | DISCARDED  — stacking LogReg+RF+XGB
+iter 5 | val_auc=0.9042 (Δ +0.0046) | KEPT       — + clinical interaction features
 ```
 
-The agent creates an `autoresearch/my-run-tag` branch, warms the dataset,
-sanity-runs the baseline, and then enters the 9-step loop. Each iteration it
-emits a single line to you:
+`KEPT` rows remain in `git log`. `DISCARDED` rows are `git reset --hard`'d out of history but logged in `results.tsv`. Leave it overnight; review in the morning.
 
-```
-iter 3 | val_auc=0.8996 (Δ +0.0012) | KEPT — LightGBM num_leaves=31, reg_lambda=1.0
-iter 4 | val_auc=0.8921 (Δ -0.0075) | DISCARDED — stacking LogReg+RF+XGB
-```
+## Run it
 
-The ratchet only moves forward; discarded commits are reset out of git
-history. Leave it running overnight; review `results.tsv` and `git log` in the
-morning.
-
-### Run one iteration by hand
-
-To eyeball the harness without the agent:
+Requires [`uv`](https://github.com/astral-sh/uv) and [Claude Code](https://claude.com/claude-code).
 
 ```bash
-uv run prepare.py                  # one-time: cache data/heart.csv
+git clone https://github.com/fjfok/autoresearch-edu.git
+cd autoresearch-edu
+uv run prepare.py        # one-time: cache data/heart.csv + sanity-check the harness
+```
+
+Then, inside Claude Code in this repo:
+
+```
+/autoresearch my-run
+```
+
+The agent creates an `autoresearch/my-run` branch, warms the cache, runs a baseline, and enters the loop. It stops only when you interrupt it, the harness breaks, or `val_auc ≥ 0.99` (inspect for leakage if that happens).
+
+## How it works
+
+| File | Role | Who edits |
+|---|---|---|
+| [`prepare.py`](prepare.py) | Frozen harness: loads data, 80/20 split, 5-fold stratified CV, 180 s wall-clock budget, prints `val_auc` / `test_auc` / `wall_time_s` / `status`. | Never. |
+| [`train.py`](train.py) | Mutable artifact: `HYPOTHESIS` string, `feature_fn`, `build_pipeline`. | Agent, every iteration. |
+| [`program.md`](program.md) | The skill: Setup, Rules, 9-step loop, NEVER STOP. | You, between runs. |
+| [`.claude/commands/autoresearch.md`](.claude/commands/autoresearch.md) | Slash command that loads `program.md` and enters the loop. | You, rarely. |
+| `results.tsv` | Append-only ratchet log — one row per iteration, including discards. Untracked. | Agent appends. |
+
+**Ratchet metric:** `val_auc`, the mean of 5-fold stratified CV on the train split. Strict inequality advances the ratchet. `test_auc` is reported for audit but never drives decisions.
+
+The 9-step loop, summarised: **state-check → edit `train.py` → commit → run → grep metrics → handle crash → append to `results.tsv` → ratchet keep/revert → loop.** Full spec in [`program.md`](program.md).
+
+### Sanity-check the harness by hand
+
+No agent required — useful when you're debugging `prepare.py` or poking at `train.py` yourself:
+
+```bash
 uv run train.py > run.log 2>&1
 grep "^val_auc:\|^test_auc:\|^wall_time_s:\|^status:" run.log
 ```
 
-## 🚀 Quick Start (using `uv`)
+You should see `status: ok` and a numeric `val_auc`. If not, the harness is broken — fix it before running the agent.
 
-We strongly recommend using [`uv`](https://github.com/astral-sh/uv), the blazing-fast Python package manager written in Rust, to run this project.
+## Tuning the loop
 
-### 1. Install `uv`
-If you don't have `uv` installed:
-```bash
-# macOS / Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
+Edit [`program.md`](program.md) between runs to narrow the hypothesis space — add hints, rule out dead ends, adjust the "what good iterations look like" examples. That file is the agent's only standing context; the leverage is there.
 
-# Windows
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
+## Results (reference run)
 
-### 2. Run the offline simulation
+One full `/autoresearch` run on this dataset produced the following, benchmarked against the [AMLB AutoML Benchmark](https://openml.github.io/automlbenchmark/) framework [3]:
 
-`uv` will automatically create an isolated environment, install dependencies, and run the script in one command:
+| Approach | Test AUC | Test Acc | Wall time |
+|----------|----------|----------|-----------|
+| Manual baseline (LogisticRegression) | 0.8474 | 76.32% | ~2 s |
+| FLAML one-shot AutoML [4] | 0.8836 | 77.63% | 45 s |
+| **AutoResearch ratchet (best of 8 iters)** | **0.9091** | **78.95%** | ~10 min |
 
-```bash
-# Clone the repository
-git clone https://github.com/fjfok/autoresearch-edu.git
-cd autoresearch-edu
+A **+6.17% AUC** lift over the manual baseline. The winning hypothesis combined clinical interaction features with FLAML's automated model search — neither on its own reached this number.
 
-# Run the offline scripted simulation (no agent required)
-uv run src/autoresearch_demo.py
-```
+Your own run will produce different numbers and a different winning hypothesis; that's the point. These are one team's results, not a script you re-execute to reproduce the table.
 
-To run the **real agent-driven loop** instead, open Claude Code in this repo
-and type `/autoresearch <your-tag>` — see "Live Ratchet Loop" above.
+### Key lessons
 
-### 3. Generate Visualizations
-After the demo completes (takes ~10 minutes on CPU), generate the charts:
-```bash
-uv run src/visualize_results.py
-```
+1. **Most hypotheses fail — and that's fine.** 7 of 8 iterations were discarded in the reference run. The ratchet enforces discipline.
+2. **Winning hypotheses are usually combinatorial.** The breakthrough combined two ideas that individually failed.
+3. **AutoResearch generalises AutoML.** AutoML searches a fixed space (hyperparameters). AutoResearch lets the agent propose *any* code change.
+4. **Monotonically non-decreasing.** The best-so-far never moves backward. Safe to run unattended.
 
-*(Alternatively, you can use standard `pip install .` or `pip install -r pyproject.toml`)*
-
-## 📊 Experimental Results
-
-We evaluate the AutoResearch ratchet loop against the standard **AMLB (OpenML AutoML Benchmark)** [3], which provides a rigorous framework for comparing AutoML systems across datasets.
-
-| Approach | Test AUC | Test Acc | Time Budget |
-|----------|----------|----------|-------------|
-| Manual Baseline (Logistic Regression) | 0.8474 | 76.32% | ~2s |
-| FLAML One-Shot AutoML | 0.8836 | 77.63% | 45s |
-| **AutoResearch Ratchet Loop (Best)** | **0.9091** | **78.95%** | ~10 min (8 iters) |
-
-<p align="center">
-  <img src="assets/benchmark_comparison.png" alt="Benchmark Comparison" width="700">
-</p>
-
-The AutoResearch ratchet loop achieves a **+6.17% improvement in AUC** over the manual baseline, placing it in the top quartile of the AMLB benchmark for this dataset class. 
-
-It discovered a non-obvious synergy: combining comprehensive feature engineering (clinical interactions + polynomial features) with FLAML's automated model search [4]. Neither feature engineering alone nor FLAML alone achieved this result.
-
-## 🤖 Claude Slash Command
-
-The `.claude/commands/autoresearch.md` slash command launches the **live
-ratchet loop** described above. In Claude Code:
-
-```text
-/autoresearch gbm-sweep
-```
-
-The command loads `program.md`, creates the `autoresearch/gbm-sweep` branch,
-completes setup, and enters the 9-step ratchet loop autonomously. It runs
-until you interrupt it.
-
-Tune the loop by editing `program.md` between runs — add hints, rule out dead
-ends, or narrow the hypothesis space.
-
-## 🧠 Key Lessons from the Ratchet Loop
-
-1. **Most hypotheses fail — and that's fine.** In our run, 7 out of 8 iterations were discarded. The ratchet enforces discipline: failed experiments leave no trace.
-2. **The winning hypothesis is often combinatorial.** The breakthrough came from combining two ideas that individually failed into a unified approach.
-3. **AutoResearch > AutoML.** Traditional AutoML searches a predefined space (hyperparameters). AutoResearch removes that constraint, allowing the agent to propose any code change.
-4. **Monotonically non-decreasing.** The running best never goes backward (0.8474 → 0.8836 → 0.9091). It is mathematically safe to let it run autonomously overnight.
-
-## 📂 Repository Structure
+## Repository structure
 
 ```text
 autoresearch-edu/
-├── .claude/
-│   └── commands/
-│       └── autoresearch.md    # Slash command — loads program.md, enters the loop
-├── prepare.py                 # FROZEN: data, split, CV, metric, time budget
-├── train.py                   # MUTABLE: the single file the agent edits
-├── program.md                 # Skill: Setup + Rules + 9-step loop + NEVER STOP
-├── results.tsv                # Append-only ratchet log (untracked, agent-managed)
-├── assets/                    # Generated visualization charts
-├── src/
-│   ├── __init__.py
-│   ├── autoresearch_demo.py   # Offline scripted simulation (no agent required)
-│   └── visualize_results.py   # Chart generation script
-├── pyproject.toml             # uv / pip dependencies
-├── README.md
+├── .claude/commands/autoresearch.md   # Slash command
+├── prepare.py                         # FROZEN harness
+├── train.py                           # MUTABLE (the only file the agent edits)
+├── program.md                         # The skill
+├── data/heart.csv                     # Cached at first run
+├── pyproject.toml
 ├── LICENSE
-└── .gitignore
+└── README.md
 ```
 
-## 📚 References
+`results.tsv`, `run.log`, and `data/` are gitignored runtime artefacts.
 
-[1] Karpathy, A. (2026). *autoresearch: AI agents running research on single-GPU nanochat training automatically*. GitHub. https://github.com/karpathy/autoresearch
+## References
 
-[2] Detrano, R., et al. (1989). *International application of a new probability algorithm for the diagnosis of coronary artery disease*. American Journal of Cardiology, 64(5), 304–310. (UCI Heart Disease Dataset)
+[1] Karpathy, A. (2026). *autoresearch: AI agents running research on single-GPU nanochat training automatically*. https://github.com/karpathy/autoresearch
 
-[3] Gijsbers, P., et al. (2024). *AMLB: an AutoML Benchmark*. Journal of Machine Learning Research. https://openml.github.io/automlbenchmark/
+[2] Detrano, R., et al. (1989). *International application of a new probability algorithm for the diagnosis of coronary artery disease*. American Journal of Cardiology, 64(5), 304–310. (UCI Heart Disease)
 
-[4] Wang, C., et al. (2021). *FLAML: A Fast and Lightweight AutoML Library*. Proceedings of MLSys 2021. https://microsoft.github.io/FLAML/
+[3] Gijsbers, P., et al. (2024). *AMLB: an AutoML Benchmark*. JMLR. https://openml.github.io/automlbenchmark/
 
----
-*Created by Manus AI for educational purposes.*
+[4] Wang, C., et al. (2021). *FLAML: A Fast and Lightweight AutoML Library*. MLSys 2021. https://microsoft.github.io/FLAML/
