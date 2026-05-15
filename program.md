@@ -60,10 +60,10 @@ ratchet decision. Treat it as write-only — do not peek at it to pick
 hypotheses, otherwise you are optimising against the holdout.
 
 **In scope.** `train.py` only. You can add or remove imports from packages
-already declared in `pyproject.toml`: sklearn, xgboost, lightgbm, flaml, numpy,
-pandas, scipy. Anything they expose is fair game — feature
-engineering, model choice, hyperparameters, ensembling, calibration,
-preprocessing, feature selection.
+already declared in `pyproject.toml`: **scikit-learn, numpy, pandas**. That's
+the whole toolbox — no FLAML, no XGBoost, no LightGBM. Anything sklearn
+exposes is fair game: feature engineering, model choice, hyperparameters,
+ensembling, calibration, preprocessing, feature selection.
 
 **Out of scope — do NOT edit:**
 - `prepare.py`, `RANDOM_STATE`, `TEST_SIZE`, `CV_FOLDS`, `TIME_BUDGET_S`.
@@ -91,15 +91,17 @@ preprocessing, feature selection.
 **What good iterations look like.**
 - Feature engineering: interactions, polynomials, binning, log/quantile
   transforms, ratios between clinically meaningful columns.
-- Model choice: LightGBM, XGBoost, ExtraTrees, GradientBoosting, SVC(rbf), MLP.
-- Preprocessing: RobustScaler, QuantileTransformer, PowerTransformer, PCA,
-  SelectKBest / variance thresholds.
+- Model choice: `HistGradientBoostingClassifier`, `GradientBoostingClassifier`,
+  `ExtraTreesClassifier`, `RandomForestClassifier`, `SVC(rbf)`, `MLPClassifier`,
+  `LogisticRegression` with engineered features.
+- Preprocessing: `RobustScaler`, `QuantileTransformer`, `PowerTransformer`,
+  `PCA`, `SelectKBest` / variance thresholds.
 - Regularisation sweeps: `C`, `alpha`, `max_depth`, `min_samples_leaf`,
-  `num_leaves`, `reg_lambda`.
-- Ensembling: `VotingClassifier(soft)`, `StackingClassifier`.
+  `max_leaf_nodes`, `l2_regularization`.
+- Ensembling: `VotingClassifier(voting='soft')`, `StackingClassifier`.
 - Calibration: `CalibratedClassifierCV(method='isotonic')`.
-- AutoML-in-loop: brief `FLAML.AutoML.fit` with a 30–60 s `time_budget` — still
-  inside the 180 s wall-clock cap.
+- Hand-rolled hyperparameter search: `GridSearchCV` or `RandomizedSearchCV`
+  with a small budget — keep the whole iteration inside the 180 s cap.
 
 ---
 

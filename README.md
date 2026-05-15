@@ -17,9 +17,9 @@ This repo ports that pattern to the [UCI Heart Disease dataset](https://www.kagg
 Each iteration, the agent emits a single line:
 
 ```
-iter 3 | val_auc=0.8996 (Δ +0.0012) | KEPT       — LightGBM num_leaves=31, reg_lambda=1.0
-iter 4 | val_auc=0.8921 (Δ -0.0075) | DISCARDED  — stacking LogReg+RF+XGB
-iter 5 | val_auc=0.9042 (Δ +0.0046) | KEPT       — + clinical interaction features
+iter 3 | val_auc=0.9004 (Δ +0.0006) | KEPT       — poly2 interactions + scaled LR (C=0.3)
+iter 4 | val_auc=0.8846 (Δ -0.0158) | DISCARDED  — poly2 + L1-penalty LR (saga)
+iter 5 | val_auc=0.9014 (Δ +0.0010) | KEPT       — VotingClassifier(soft): poly2+LR + ExtraTrees
 ```
 
 `KEPT` rows remain in `git log`. `DISCARDED` rows are `git reset --hard`'d out of history but logged in `results.tsv`. Leave it overnight; review in the morning.
@@ -73,22 +73,21 @@ Edit [`program.md`](program.md) between runs to narrow the hypothesis space — 
 
 ## Results (reference run)
 
-One full `/autoresearch` run on this dataset produced the following, benchmarked against the [AMLB AutoML Benchmark](https://openml.github.io/automlbenchmark/) framework [3]:
+One full `/autoresearch` run on this dataset, using the sklearn-only toolbox (no FLAML / XGBoost / LightGBM):
 
 | Approach | Test AUC | Test Acc | Wall time |
 |----------|----------|----------|-----------|
-| Manual baseline (LogisticRegression) | 0.8474 | 76.32% | ~2 s |
-| FLAML one-shot AutoML [4] | 0.8836 | 77.63% | 45 s |
-| **AutoResearch ratchet (best of 8 iters)** | **0.9091** | **78.95%** | ~10 min |
+| Manual baseline (LogisticRegression) | 0.8690 | 80.33% | ~0.03 s |
+| **AutoResearch ratchet (best of 10 iters)** | **0.8983** | **81.97%** | ~1.7 s |
 
-A **+6.17% AUC** lift over the manual baseline. The winning hypothesis combined clinical interaction features with FLAML's automated model search — neither on its own reached this number.
+A **+0.029 absolute test AUC** lift over the baseline — and +1.6 percentage points of test accuracy — from a stack of sklearn primitives the agent discovered in ten iterations. The winning pipeline: `VotingClassifier(soft)` over `PolynomialFeatures(deg=2, interaction_only) → StandardScaler → LogisticRegression(C=0.3)` and `ExtraTreesClassifier(n_estimators=800, min_samples_leaf=2)`.
 
 Your own run will produce different numbers and a different winning hypothesis; that's the point. These are one team's results, not a script you re-execute to reproduce the table.
 
 ### Key lessons
 
-1. **Most hypotheses fail — and that's fine.** 7 of 8 iterations were discarded in the reference run. The ratchet enforces discipline.
-2. **Winning hypotheses are usually combinatorial.** The breakthrough combined two ideas that individually failed.
+1. **Most hypotheses fail — and that's fine.** 6 of 10 iterations were discarded in the reference run. The ratchet enforces discipline.
+2. **Winning hypotheses are usually combinatorial.** The breakthrough combined poly-2 interactions with a tree ensemble — neither alone matched it.
 3. **AutoResearch generalises AutoML.** AutoML searches a fixed space (hyperparameters). AutoResearch lets the agent propose *any* code change.
 4. **Monotonically non-decreasing.** The best-so-far never moves backward. Safe to run unattended.
 
@@ -114,6 +113,4 @@ autoresearch-edu/
 
 [2] Detrano, R., et al. (1989). *International application of a new probability algorithm for the diagnosis of coronary artery disease*. American Journal of Cardiology, 64(5), 304–310. (UCI Heart Disease)
 
-[3] Gijsbers, P., et al. (2024). *AMLB: an AutoML Benchmark*. JMLR. https://openml.github.io/automlbenchmark/
-
-[4] Wang, C., et al. (2021). *FLAML: A Fast and Lightweight AutoML Library*. MLSys 2021. https://microsoft.github.io/FLAML/
+[3] Pedregosa, F., et al. (2011). *Scikit-learn: Machine Learning in Python*. JMLR 12, 2825–2830. https://scikit-learn.org/
